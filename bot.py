@@ -99,7 +99,7 @@ class Run:
         return leaderboardParams
 
     async def setPreviousPB(self) -> None:
-        getGameLeaderboardResponse = await speedruncompy.GetGameLeaderboard2(**self.leaderboardParams()).perform_all()
+        getGameLeaderboardResponse = await speedruncompy.GetGameLeaderboard2(**self.leaderboardParams()).perform_all_async()
         runList = getGameLeaderboardResponse.runList
         oldPB = {
             'exists': False,
@@ -465,7 +465,7 @@ async def initialPrep() -> None:
     global rememberedRuns
     for series in settings['series']:
         endpoint = speedruncompy.GetLatestLeaderboard(seriesId=series, limit=100, vary=randint(0, 1_000_000))
-        data = await endpoint.perform()
+        data = await endpoint.perform_async()
         rememberedRuns[series] = [run['id'] for run in data['runs']]
 
 
@@ -502,7 +502,7 @@ async def checkForNewRuns():
             limit=50,
             vary=randint(0, 1_000_000)
             )
-        data = await endpoint.perform()
+        data = await endpoint.perform_async()
         for run in data['runs']:
             if run['id'] not in rememberedRuns[series]:
                 newRun = Run(
@@ -533,7 +533,7 @@ async def checkForNewRuns():
 async def checkForNewStreams():
     seriesId = '15ndxp7r'
     endpoint = speedruncompy.GetStreamList(seriesId=seriesId, vary=randint(0, 1_000_000))
-    data = await endpoint.perform()
+    data = await endpoint.perform_async()
     streamsToDelete = []
     for user in rememberedStreams.keys():
         if user not in [streamData['channelName'] for streamData in data['streamList']]:
@@ -566,7 +566,7 @@ async def run_to_embed(interaction: discord.Interaction, run_id: str):
     await interaction.response.defer()
     try:
         endpoint = speedruncompy.GetRun(runId=run_id)
-        data = await endpoint.perform()
+        data = await endpoint.perform_async()
         runToEmbed = Run(
             data['run'],
             data['category'],
