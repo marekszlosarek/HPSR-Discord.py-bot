@@ -33,8 +33,12 @@ class Run:
             'id': gameData['id'],
             'name': gameData['name'],
             'abbreviation': gameData['url'],
-            'cover': 'https://www.speedrun.com'+gameData['coverPath'],
+            'cover': '',
         }
+        for asset in gameData['staticAssets']:
+            if asset['assetType'] == 'cover':
+                self.gameInfo['cover'] = 'https://www.speedrun.com'+asset['path']
+
         self.settings = settings['games'].get(self.gameInfo['id'], settings['games']['default'])
 
         self.categoryInfo = {
