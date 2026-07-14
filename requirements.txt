@@ -1,6 +1,6 @@
 discord.py
 python-dotenv
-speedruncompy>=0.4.0
+speedruncompy=0.4.0
 websockets
 requests
 matplotlib
