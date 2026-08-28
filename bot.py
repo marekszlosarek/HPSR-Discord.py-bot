@@ -537,7 +537,7 @@ class FormatText:
         
     @staticmethod
     def numberToProgressBar(number: float, segments: int):
-        fixed = (number*segments*2)
+        fixed = round(number*segments*2)
         full = fixed//2
         half = fixed%2
         empty = segments - full - half
