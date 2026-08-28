@@ -6,6 +6,7 @@ import tracemalloc
 import discord
 from discord.ext import commands, tasks
 import speedruncompy
+from speedruncompy import VarValues
 import json
 from utilis.verify_settings import *
 from utilis.pace_graph_generator import get_graph
@@ -22,102 +23,155 @@ with open('settings.json', 'r') as settingsFile:
     settings = json.load(settingsFile) 
 
 class Run:
-    def __init__(self, runData: dict, categoryData: dict, gameData: dict, levelData: dict|None, valuesData: list[dict], variablesData: list[dict], playersData: list[dict]) -> None:
-        self.id = runData['id']
-        self.position = runData['place']
-        self.time = runData['time'] if 'time' in runData else runData['timeWithLoads']
-        self.dateSubmitted = runData['dateSubmitted']
-        self.playerIds = runData['playerIds']
+    def __init__(self, runData, categoryData, gameData, levelData, valuesData, variablesData, playersData) -> None:
+        self.id = runData.id
+        self.position = runData.place
+        self.time = runData.time if runData.time is not None else (
+            runData.timeWithLoads if runData.timeWithLoads is not None else runData.igt
+        )
+        self.dateSubmitted = runData.dateSubmitted
+        self.playerIds = runData.playerIds
 
         self.gameInfo = {
-            'id': gameData['id'],
-            'name': gameData['name'],
-            'abbreviation': gameData['url'],
+            'id': gameData.id,
+            'name': gameData.name,
+            'abbreviation': gameData.url,
             'cover': '',
         }
-        for asset in gameData['staticAssets']:
-            if asset['assetType'] == 'cover':
-                self.gameInfo['cover'] = 'https://www.speedrun.com'+asset['path']
 
-        self.settings = settings['games'].get(self.gameInfo['id'], settings['games']['default'])
+        for asset in gameData.staticAssets:
+            if asset.assetType == 'cover':
+                self.gameInfo['cover'] = 'https://www.speedrun.com' + asset.path
+
+        self.settings = settings['games'].get(
+            self.gameInfo['id'],
+            settings['games']['default']
+        )
 
         self.categoryInfo = {
-            'id': categoryData['id'],
-            'name': categoryData['name'],
+            'id': categoryData.id,
+            'name': categoryData.name,
         }
 
-        self.isFullGame = levelData == None
+        self.isFullGame = levelData is None
         if not self.isFullGame:
             self.levelInfo = {
-                'id': levelData['id'],
-                'name': levelData['name'],
+                'id': levelData.id,
+                'name': levelData.name,
             }
 
         self.subcategories = {
-            variableData['id']: variableData['isSubcategory'] for variableData in variablesData
+            variableData.id: variableData.isSubcategory
+            for variableData in variablesData
         }
-        
+
         self.valuesInfo = [
             {
-                'id': valueData['id'],
-                'name': valueData['name'],
-                'variableId': valueData['variableId'],
-            } for valueData in valuesData if self.subcategories[valueData['variableId']]
-        ]
-        
-        self.playersInfo = [
-            {
-                'id': playerData['id'],
-                'name': playerData['name'],
-                'url': f'https://www.speedrun.com/users/{playerData["url"]}' if 'url' in playerData else None,
-                'image': f'https://www.speedrun.com/static/user/{playerData["id"]}/image' if 'url' in playerData else None,
-                'country': (playerData['areaId'].split('/')[0] if playerData['areaId'] != '' else None) if 'areaId' in playerData else None,
-            } for playerData in playersData
+                'id': valueData.id,
+                'name': valueData.name,
+                'variableId': valueData.variableId,
+            }
+            for valueData in valuesData
+            if self.subcategories.get(valueData.variableId, False)
         ]
 
-        self.weblink = f'https://www.speedrun.com/{self.gameInfo["abbreviation"]}/runs/{self.id}'
-        self.leaderboardLink = f'https://www.speedrun.com/{self.gameInfo["abbreviation"]}?x={"l_"+self.levelInfo["id"]+"-" if not self.isFullGame else ""}{self.categoryInfo["id"]}{"".join(["-"+value["variableId"]+"."+value["id"] for value in self.valuesInfo])}'
-        if self.position == 1 and (self.isFullGame or (not self.isFullGame and self.settings['il_mode'] > 1)):
+        self.playersInfo = [
+            {
+                'id': playerData.id,
+                'name': playerData.name,
+                'url': (
+                    f'https://www.speedrun.com/users/{playerData.url}'
+                    if playerData.url else None
+                ),
+                'image': (
+                    f'https://www.speedrun.com/static/user/{playerData.id}/image'
+                    if playerData.url else None
+                ),
+                'country': (
+                    playerData.areaId.split('/')[0]
+                    if playerData.areaId else None
+                ),
+            }
+            for playerData in playersData
+        ]
+
+        self.weblink = (
+            f'https://www.speedrun.com/{self.gameInfo["abbreviation"]}'
+            f'/runs/{self.id}'
+        )
+
+        level_prefix = (
+            f'l_{self.levelInfo["id"]}-'
+            if not self.isFullGame else ''
+        )
+        values_suffix = ''.join(
+            f'-{value["variableId"]}.{value["id"]}'
+            for value in self.valuesInfo
+        )
+        self.leaderboardLink = (
+            f'https://www.speedrun.com/{self.gameInfo["abbreviation"]}'
+            f'?x={level_prefix}{self.categoryInfo["id"]}{values_suffix}'
+        )
+
+        if self.position == 1 and (
+            self.isFullGame or
+            (not self.isFullGame and self.settings['il_mode'] > 1)
+        ):
             self.pings = ' '.join(self.settings['wr_ping'])
         else:
             self.pings = ''
 
     def leaderboardParams(self) -> dict:
-        leaderboardParams = {}
-        leaderboardParams['gameId'] = self.gameInfo['id']
-        leaderboardParams['categoryId'] = self.categoryInfo['id']
-        if not self.isFullGame:
-            leaderboardParams['levelId'] = self.levelInfo['id']
-        leaderboardParams['values'] = [
-            {
-                'variableId': value['variableId'], 
-                'valueIds': [value['id']]
-            } for value in self.valuesInfo if self.subcategories[value['variableId']]
-        ]
-        leaderboardParams['obsolete'] = 1
+        params = {
+            'gameId': self.gameInfo['id'],
+            'categoryId': self.categoryInfo['id'],
+            'obsolete': 1,
+            'values': [
+                VarValues(
+                    variableId=value['variableId'],
+                    valueIds=[value['id']]
+                )
+                for value in self.valuesInfo
+                if self.subcategories.get(value['variableId'], False)
+            ],
+        }
 
-        return leaderboardParams
+        if not self.isFullGame:
+            params['levelId'] = self.levelInfo['id']
+
+        return params
 
     async def setPreviousPB(self) -> None:
-        getGameLeaderboardResponse = await speedruncompy.GetGameLeaderboard2(**self.leaderboardParams()).perform_all_async()
-        runList = getGameLeaderboardResponse.runList
+        response = await speedruncompy.GetGameLeaderboard2(
+            **self.leaderboardParams()
+        ).perform_all()
+
         oldPB = {
             'exists': False,
             'place': 1,
             'time': 0,
         }
-        for run in runList:
+
+        for run in response.runList:
             if run.obsolete:
                 if run.playerIds == self.playerIds:
                     oldPB['exists'] = True
-                    oldPB['time'] = run.time if run.time else (run.timeWithLoads if run.timeWithLoads else run.igt)
+                    oldPB['time'] = (
+                        run.time
+                        if run.time is not None
+                        else (
+                            run.timeWithLoads
+                            if run.timeWithLoads is not None
+                            else run.igt
+                        )
+                    )
                     self.oldPB = oldPB
-                    return 
-            else:
+                    return
+            elif run.place is not None:
                 oldPB['place'] = run.place
-            
+
         self.oldPB = oldPB
-        
+
 
 class RunEmbed(discord.Embed):
     def __init__(self, run: Run) -> None:
@@ -183,25 +237,37 @@ class RunEmbed(discord.Embed):
 class StreamEmbed(discord.Embed):
     def __init__(self, streamData, gameData, userData) -> None:
         super().__init__()
-        self.authorName = userData['name']
-        userAssets = [asset for asset in userData['staticAssets'] if asset['assetType'] == 'image']
-        authorIcon = 'https://www.speedrun.com' + userAssets[0]['path'] if userAssets else None
-        self.authorLink = 'https://www.speedrun.com/user/'+userData['url']
-        self.twitchLink = streamData['url']
-        title = streamData['title']
-        self.gameSettings = settings['games'].get(gameData['id'], settings['games']['default'])
-        gameName = self.gameSettings.get('display_name', gameData['name'])
-        self.colour = 0xffffff if streamData['hasPb'] else 0x000000
+        self.authorName = userData.name
+        userAssets = [
+            asset for asset in userData.staticAssets
+            if asset.assetType == 'image'
+        ]
+        authorIcon = (
+            'https://www.speedrun.com' + userAssets[0].path
+            if userAssets else None
+        )
+        self.authorLink = 'https://www.speedrun.com/user/' + userData.url
+        self.twitchLink = streamData.url
+        title = streamData.title
+        self.gameSettings = settings['games'].get(
+            gameData.id,
+            settings['games']['default']
+        )
+        gameName = self.gameSettings.get('display_name', gameData.name)
+        self.colour = 0xffffff if streamData.hasPb else 0x000000
         self.title = title
         self.url = self.twitchLink
-        self.area = streamData['areaId']
-        self.streamName = streamData["channelName"]
-        self.set_image(url=streamData['previewUrl'] + '?vary=' + str(randint(0, 1_000_000)))
+        self.area = streamData.areaId
+        self.streamName = streamData.channelName
+        self.set_image(
+            url=streamData.previewUrl +
+            '?vary=' + str(randint(0, 1_000_000))
+        )
         self.label = f'{FormatText.getFlagEmoji(self.area)} **{self.streamName}** is streaming **{gameName}** {self.gameSettings["emote"]}'
         self.set_author(
-            name = self.authorName,
-            icon_url = authorIcon,
-            url = self.authorLink
+            name=self.authorName,
+            icon_url=authorIcon,
+            url=self.authorLink
         )
         self.hasTherun = False
         self.therunWebsocket = None
@@ -465,8 +531,8 @@ async def initialPrep() -> None:
     global rememberedRuns
     for series in settings['series']:
         endpoint = speedruncompy.GetLatestLeaderboard(seriesId=series, limit=100, vary=randint(0, 1_000_000))
-        data = await endpoint.perform_async()
-        rememberedRuns[series] = [run['id'] for run in data['runs']]
+        data = await endpoint.perform()
+        rememberedRuns[series] = [run.id for run in data.runs]
 
 
 
@@ -502,17 +568,23 @@ async def checkForNewRuns():
             limit=50,
             vary=randint(0, 1_000_000)
             )
-        data = await endpoint.perform_async()
-        for run in data['runs']:
-            if run['id'] not in rememberedRuns[series]:
+        data = await endpoint.perform()
+        for run in data.runs:
+            if run.id not in rememberedRuns[series]:
+                categoryData = next(c for c in data.categories if c.id == run.categoryId)
+                gameData = next(g for g in data.games if g.id == run.gameId)
+                levelData = (
+                    next(l for l in data.levels if l.id == run.levelId)
+                    if run.levelId is not None else None
+                )
                 newRun = Run(
                     run,
-                    [categoryData for categoryData in data['categories'] if categoryData['id'] == run['categoryId']][0],
-                    [gameData for gameData in data['games'] if gameData['id'] == run['gameId']][0],
-                    [levelData for levelData in data['levels'] if levelData['id'] == run['levelId']][0] if 'levelId' in run else None,
-                    [valueData for valueData in data['values'] if valueData['id'] in run['valueIds']],
-                    data['variables'],
-                    [playerData for playerData in data['players'] if playerData['id'] in run['playerIds']]
+                    categoryData,
+                    gameData,
+                    levelData,
+                    [value for value in data.values if value.id in run.valueIds],
+                    data.variables,
+                    [player for player in data.players if player.id in run.playerIds]
                 ) 
 
                 if newRun.settings['il_mode'] == 0:
@@ -533,10 +605,10 @@ async def checkForNewRuns():
 async def checkForNewStreams():
     seriesId = '15ndxp7r'
     endpoint = speedruncompy.GetStreamList(seriesId=seriesId, vary=randint(0, 1_000_000))
-    data = await endpoint.perform_async()
+    data = await endpoint.perform()
     streamsToDelete = []
     for user in rememberedStreams.keys():
-        if user not in [streamData['channelName'] for streamData in data['streamList']]:
+        if user not in [streamData.channelName for streamData in data.streamList]:
             streamsToDelete.append(user)
     for user in streamsToDelete:
         print(f"Deleting {user}'s stream")
@@ -549,15 +621,21 @@ async def checkForNewStreams():
         if streamEmbed.therunWebsocket:
             streamEmbed.therunListenTask.cancel()
             streamEmbed.therunListenTask = asyncio.create_task(streamEmbed.listenToTherun())
-    for streamData in data['streamList']:
-        if streamData['channelName'] not in rememberedStreams.keys():
-            gameData = [game for game in data['gameList'] if streamData['gameId'] == game['id']][0]
-            userData = [user for user in data['userList'] if streamData['userId'] == user['id']][0]
+    for streamData in data.streamList:
+        if streamData.channelName not in rememberedStreams:
+            gameData = next(
+                game for game in data.gameList
+                if streamData.gameId == game.id
+            )
+            userData = next(
+                user for user in data.userList
+                if streamData.userId == user.id
+            )
             streamEmbed = StreamEmbed(streamData, gameData, userData)
             await streamEmbed.setTherunProfileName()
             streamEmbed.setButtonView()
             await streamEmbed.sendMessages()
-            rememberedStreams[streamData['channelName']] = streamEmbed
+            rememberedStreams[streamData.channelName] = streamEmbed
 
 
 @client.tree.command(name='run_to_embed')
@@ -566,15 +644,15 @@ async def run_to_embed(interaction: discord.Interaction, run_id: str):
     await interaction.response.defer()
     try:
         endpoint = speedruncompy.GetRun(runId=run_id)
-        data = await endpoint.perform_async()
+        data = await endpoint.perform()
         runToEmbed = Run(
-            data['run'],
-            data['category'],
-            data['game'],
-            data['level'] if 'levelId' in data['run'] else None,
-            data['values'],
-            data['variables'],
-            data['players']
+            data.run,
+            data.category,
+            data.game,
+            data.level,
+            data.values,
+            data.variables,
+            data.players
         ) 
         await runToEmbed.setPreviousPB()
 
