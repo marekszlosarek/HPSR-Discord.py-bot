@@ -580,7 +580,7 @@ async def checkForNewRuns():
                     data.level,
                     data.values,
                     data.variables,
-                    data.users
+                    [playerData for playerData in data.users if playerData.id in data.run.playerIds]    
                 ) 
 
                 if newRun.settings['il_mode'] == 0:
@@ -648,7 +648,7 @@ async def run_to_embed(interaction: discord.Interaction, run_id: str):
             data.level,
             data.values,
             data.variables,
-            data.users
+            [playerData for playerData in data.users if playerData.id in data.run.playerIds]
         ) 
         await runToEmbed.setPreviousPB()
 
