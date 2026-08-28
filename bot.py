@@ -84,8 +84,8 @@ class Run:
                     if playerData.url else None
                 ),
                 'image': (
-                    f'https://www.speedrun.com/static/user/{playerData.id}/image'
-                    if playerData.url else None
+                    'https://www.speedrun.com' + [asset for asset in playerData.staticAssets if asset.assetType == 'image'][0].path
+                    if playerData.staticAssets else None
                 ),
                 'country': (
                     playerData.areaId.split('/')[0]
@@ -554,7 +554,7 @@ async def on_ready():
     await initialPrep()
     print("Ready!")
     tasks.loop(minutes = settings['loop_period'])(checkForNewRuns).start()
-    tasks.loop(minutes = settings['loop_period'])(checkForNewStreams).start()
+    ##tasks.loop(minutes = settings['loop_period'])(checkForNewStreams).start()
 
 
 
@@ -571,20 +571,16 @@ async def checkForNewRuns():
         data = await endpoint.perform()
         for run in data.runs:
             if run.id not in rememberedRuns[series]:
-                categoryData = next(c for c in data.categories if c.id == run.categoryId)
-                gameData = next(g for g in data.games if g.id == run.gameId)
-                levelData = (
-                    next(l for l in data.levels if l.id == run.levelId)
-                    if run.levelId is not None else None
-                )
+                endpoint = speedruncompy.GetRun(runId=run.id)
+                data = await endpoint.perform()
                 newRun = Run(
-                    run,
-                    categoryData,
-                    gameData,
-                    levelData,
-                    [value for value in data.values if value.id in run.valueIds],
+                    data.run,
+                    data.category,
+                    data.game,
+                    data.level,
+                    data.values,
                     data.variables,
-                    [player for player in data.players if player.id in run.playerIds]
+                    data.users
                 ) 
 
                 if newRun.settings['il_mode'] == 0:
@@ -638,7 +634,7 @@ async def checkForNewStreams():
             rememberedStreams[streamData.channelName] = streamEmbed
 
 
-@client.tree.command(name='run_to_embed')
+@client.tree.command(name='run_to_embed_test')
 @discord.app_commands.describe(run_id = 'ID of the run you want to embed')
 async def run_to_embed(interaction: discord.Interaction, run_id: str):
     await interaction.response.defer()
@@ -652,7 +648,7 @@ async def run_to_embed(interaction: discord.Interaction, run_id: str):
             data.level,
             data.values,
             data.variables,
-            data.players
+            data.users
         ) 
         await runToEmbed.setPreviousPB()
 
