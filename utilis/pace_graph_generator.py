@@ -1,16 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from requests import get, post
 import io
-import base64
-from dotenv import load_dotenv
-import os
 
 
-load_dotenv()
-IMGBB_API_KEY = os.getenv('IMGBB_API_KEY')
-
-def get_graph(theRunData) -> str:
+def get_graph(theRunData) -> bytes:
     splits = [(0,0)]
     golds = []
 
@@ -24,9 +17,9 @@ def get_graph(theRunData) -> str:
             if pb:
                 splits.append((current/1000, (pb-current)/1000))
 
-    graph = make_graph(splits, golds) 
+    graph = make_graph(splits, golds)
 
-    return upload_image_to_imgbb(graph.getvalue())
+    return graph.getvalue()
 
 
 
@@ -104,24 +97,3 @@ def make_graph(points, golds=[]) -> io.BytesIO:
     buffer.seek(0)
 
     return buffer
-
-
-def upload_image_to_imgbb(image_data) -> str:
-    url = 'https://api.imgbb.com/1/upload'
-    base64_image = base64.b64encode(image_data).decode('utf-8')
-    payload = {
-        'key': IMGBB_API_KEY,
-        'image': base64_image,
-        'expiration': 1800
-    }
-    response = post(url, data=payload)
-    response_data = response.json()
-
-    return response_data['data']['url']
-
-
-if __name__ == '__main__':
-    url = "https://therun.gg/api/live/Dogecyanide"
-    theRunData = get(url).json()
-
-    print(get_graph(theRunData))

@@ -13,6 +13,7 @@ from utilis.pace_graph_generator import get_graph
 import aiohttp
 import websockets
 import asyncio
+import io
 
 
 tracemalloc.start()
@@ -305,7 +306,22 @@ class StreamEmbed(discord.Embed):
                     therunUserData = therunLiveUserData["run"]
                     therunEmbed = TherunEmbed(therunUserData)
                     for message in self.messages:
-                        await message.edit(content=self.label, embeds=[self, therunEmbed], view=self.view)
+                        attachments = []
+
+                        if therunEmbed.graph:
+                            attachments.append(
+                                discord.File(
+                                    io.BytesIO(therunEmbed.graph),
+                                    filename="pace_graph.png"
+                                )
+                            )
+
+                        await message.edit(
+                            content=self.label,
+                            embeds=[self, therunEmbed],
+                            attachments=attachments,
+                            view=self.view
+                        )
 
                 
 
@@ -332,7 +348,10 @@ class TherunEmbed(discord.Embed):
             url = "https://therun.gg/live/" + self.user,
             icon_url = "https://therun.gg/media/logo/logo_dark_theme_no_text.png"
         )
-        # self.set_thumbnail(url=self.getThumbnail())
+        self.graph: bytes|None = self.getGraph()
+
+        if self.graph:
+            self.set_thumbnail(url="attachment://pace_graph.png")
 
     def deltaToTime(self) -> str:
         return FormatText.convertSplitTime(self.delta)
@@ -346,7 +365,7 @@ class TherunEmbed(discord.Embed):
             return 0x808080
         
     def progressBar(self) -> str:
-        return FormatText.numberToProgressBar(self.runPercentage, 15)
+        return FormatText.numberToProgressBar(min(self.runPercentage, 1), 15)
     
     def personalBest(self) -> str:
         if self.pb:
@@ -405,9 +424,10 @@ class TherunEmbed(discord.Embed):
                 Run progression: {self.progressBar()}".replace('                ', '')
         
 
-    def getThumbnail(self) -> str|None:
+    def getGraph(self) -> bytes|None:
         if self.currentSplitIndex < 1:
             return None
+
         return get_graph(self.data)
 
 
@@ -517,7 +537,7 @@ class FormatText:
         
     @staticmethod
     def numberToProgressBar(number: float, segments: int):
-        fixed = round(number*segments*2)
+        fixed = (number*segments*2)
         full = fixed//2
         half = fixed%2
         empty = segments - full - half
