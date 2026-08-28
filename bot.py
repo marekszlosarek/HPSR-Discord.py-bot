@@ -554,7 +554,7 @@ async def on_ready():
     await initialPrep()
     print("Ready!")
     tasks.loop(minutes = settings['loop_period'])(checkForNewRuns).start()
-#    tasks.loop(minutes = settings['loop_period'])(checkForNewStreams).start()
+    tasks.loop(minutes = settings['loop_period'])(checkForNewStreams).start()
 
 
 
@@ -634,7 +634,7 @@ async def checkForNewStreams():
             rememberedStreams[streamData.channelName] = streamEmbed
 
 
-@client.tree.command(name='run_to_embed_test')
+@client.tree.command(name='run_to_embed')
 @discord.app_commands.describe(run_id = 'ID of the run you want to embed')
 async def run_to_embed(interaction: discord.Interaction, run_id: str):
     await interaction.response.defer()
