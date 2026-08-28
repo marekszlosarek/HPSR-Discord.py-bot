@@ -554,7 +554,7 @@ async def on_ready():
     await initialPrep()
     print("Ready!")
     tasks.loop(minutes = settings['loop_period'])(checkForNewRuns).start()
-    tasks.loop(minutes = settings['loop_period'])(checkForNewStreams).start()
+#    tasks.loop(minutes = settings['loop_period'])(checkForNewStreams).start()
 
 
 
@@ -580,7 +580,7 @@ async def checkForNewRuns():
                     data.level,
                     data.values,
                     data.variables,
-                    data.users
+                    [playerData for playerData in data.users if playerData.id in data.run.playerIds]    
                 ) 
 
                 if newRun.settings['il_mode'] == 0:
@@ -634,7 +634,7 @@ async def checkForNewStreams():
             rememberedStreams[streamData.channelName] = streamEmbed
 
 
-@client.tree.command(name='run_to_embed')
+@client.tree.command(name='run_to_embed_test')
 @discord.app_commands.describe(run_id = 'ID of the run you want to embed')
 async def run_to_embed(interaction: discord.Interaction, run_id: str):
     await interaction.response.defer()
@@ -648,7 +648,7 @@ async def run_to_embed(interaction: discord.Interaction, run_id: str):
             data.level,
             data.values,
             data.variables,
-            data.users
+            [playerData for playerData in data.users if playerData.id in data.run.playerIds]
         ) 
         await runToEmbed.setPreviousPB()
 
