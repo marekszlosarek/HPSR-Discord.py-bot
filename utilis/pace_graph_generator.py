@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt
-import numpy as np
 import io
 
 
@@ -31,30 +30,69 @@ def make_graph(points, golds=[]) -> io.BytesIO:
     for i in range(len(points) - 1):
         x_values = [points[i][0], points[i+1][0]]
         y_values = [points[i][1], points[i+1][1]]
-        
-        # Determine line color
-        if i in golds:
-            line_color = 'gold'
-        else:
-            line_color = 'black'
-        
-        # Plot the line
-        ax.plot(x_values, y_values, color=line_color)
 
-    updated_points = [(0,0)]
-    # Fill the areas between points
+        ax.plot(x_values, y_values, color='black')
+
+    updated_points = [(0, 0)]
+
     for i in range(len(points) - 1):
-        x_start, y_start = points[i]
-        x_end, y_end = points[i+1]
+        p1 = points[i]
+        p2 = points[i + 1]
 
+        x_start, y_start = p1
+        x_end, y_end = p2
+
+        is_gold = i in golds
+
+        # If the segment crosses zero, split it at the intersection
         if y_start * y_end < 0:
-            p1 = np.array(points[i])
-            p2 = np.array(points[i+1])
-            
-            # Calculate the intersection point where y = 0
-            x_intersect = (p1[0] * p2[1] - p2[0] * p1[1]) / (p2[1] - p1[1])
-            updated_points.append((x_intersect, 0))
-        updated_points.append(points[i+1])
+            x_intersect = (
+                x_start * y_end - x_end * y_start
+            ) / (y_end - y_start)
+
+            # First half
+            fill_color = 'gold' if is_gold else (
+                'green' if y_start >= 0 else 'red'
+            )
+
+            ax.fill_between(
+                [x_start, x_intersect],
+                [y_start, 0],
+                0,
+                color=fill_color,
+                alpha=0.7
+            )
+
+            # Second half
+            fill_color = 'gold' if is_gold else (
+                'green' if y_end >= 0 else 'red'
+            )
+
+            ax.fill_between(
+                [x_intersect, x_end],
+                [0, y_end],
+                0,
+                color=fill_color,
+                alpha=0.7
+            )
+
+        else:
+            if is_gold:
+                fill_color = 'gold'
+            elif y_start >= 0 and y_end >= 0:
+                fill_color = 'green'
+            elif y_start <= 0 and y_end <= 0:
+                fill_color = 'red'
+            else:
+                fill_color = 'gold'
+
+            ax.fill_between(
+                [x_start, x_end],
+                [y_start, y_end],
+                0,
+                color=fill_color,
+                alpha=0.7
+            )
 
 
     for i in range(len(updated_points) - 1):
@@ -97,3 +135,22 @@ def make_graph(points, golds=[]) -> io.BytesIO:
     buffer.seek(0)
 
     return buffer
+
+
+if __name__ == "__main__":
+    import requests
+
+    username = "spykerios"
+    url = f"https://therun.gg/api/live/{username}"
+
+    response = requests.get(url)
+    response.raise_for_status()
+
+    data = response.json()
+
+    graph = get_graph(data)
+
+    with open("pace_graph.png", "wb") as f:
+        f.write(graph)
+
+    print("Graph saved to pace_graph.png")
