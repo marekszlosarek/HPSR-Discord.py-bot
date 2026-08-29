@@ -13,7 +13,7 @@ def get_graph(theRunData) -> bytes:
         gold = split['bestPossible']
         if current:
             if (not gold) or (gold > current-splits[-1][0]*1000):
-                golds.append(len(splits))
+                golds.append(len(splits)-1)
             if pb:
                 splits.append((current/1000, (pb-current)/1000))
 
