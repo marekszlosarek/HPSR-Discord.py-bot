@@ -110,13 +110,14 @@ def make_graph(points, golds=[]) -> io.BytesIO:
         # Fill the area between the points and the x-axis
         ax.fill_between([x_start, x_end], [y_start, y_end], 0, color=fill_color, alpha=0.7)
 
+    dot_scale = max(0.25, 1 - len(points) / 100)
     # Plot the points
     for x, y in points:
         if y >= 0:
             point_color = 'green'
         elif y < 0:
             point_color = 'red'
-        ax.plot(x, y, 'o', color=point_color)
+        ax.plot(x, y, 'o', color=point_color, markersize=6 * dot_scale)
 
     # Add grid and axes lines
     plt.axhline(0, color='black', linewidth=0.5)
@@ -140,7 +141,7 @@ def make_graph(points, golds=[]) -> io.BytesIO:
 if __name__ == "__main__":
     import requests
 
-    username = "spykerios"
+    username = "flo203"
     url = f"https://therun.gg/api/live/{username}"
 
     response = requests.get(url)
